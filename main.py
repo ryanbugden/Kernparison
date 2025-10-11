@@ -93,7 +93,7 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
         hits = self.grid_container.findSublayersContainingPoint(
             (x, y),
             onlyAcceptsHit=True,
-            recurse=False
+            recurse=True
         )
         if not hits:
             return None
@@ -107,12 +107,20 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
         return (x,y)
         
     def mouseDown(self, view, event):
+        self.build_cells()
         event = merz.unpackEvent(event)
         click_count = event["clickCount"]
-        print(click_count)
-        if click_count == 2:
-            self.start = (x,y) = self._convert_location(event)
-            hit = self._get_item_at_event((x,y))
+        (x,y) = self._convert_location(event)
+        hit = self._get_item_at_event((x,y))
+        hit_name = hit.getName()
+        if hit_name is not None:
+            hit.setBorderWidth(2)
+            # hit.setBackgroundColor((0,0,1,0.5))
+            if click_count == 2:
+                i = int(hit_name)
+                # Open font
+                font = self.fonts[i]
+                font.openInterface()
         
     def build_cells(self):
         # Calculate sizes and arrangement
@@ -162,9 +170,12 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
                 self.grid_container.appendBaseSublayer(
                     position=(x, y),
                     size=(uw, uh),
-                    strokeColor=kern_fill_color,
+                    borderColor=kern_fill_color,
+                    borderWidth=0,
                     backgroundColor=kern_bg_color,
                     cornerRadius=8,
+                    name=str(i),
+                    acceptsHit=True,
                 )
                 self.grid_container.appendTextLineSublayer(
                     position=(
@@ -175,6 +186,7 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
                     fillColor=(0,0,0,1),
                     horizontalAlignment="center",
                     text=f"{font.info.styleName}",
+                    acceptsHit=False,
                 )
                 self.grid_container.appendTextLineSublayer(
                     position=(x + uw/2, y + 40),
@@ -183,10 +195,12 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
                     fillColor=kern_fill_color,
                     horizontalAlignment="center",
                     text=str(get_kern_value(font, self.pair)),
+                    acceptsHit=False,
                 )
                 kern_pair_sublayer = self.grid_container.appendBaseSublayer(
                     position=(0, 0),
-                    size=(2000, 1000),
+                    size=(0, 0),
+                    acceptsHit=False,
                 )
                 x_advance = 0
                 pair_width = 0
@@ -195,6 +209,7 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
                     glyph_path = glyph.getRepresentation("merz.CGPath")
                     glyph_path_layer = kern_pair_sublayer.appendPathSublayer(
                         fillColor=(0, 0, 0, 1),
+                        acceptsHit=False,
                         )            
                     glyph_path_layer.addTranslationTransformation((x_advance, 0))
                     glyph_path_layer.setPath(glyph_path)
