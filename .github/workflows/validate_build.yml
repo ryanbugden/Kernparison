@@ -6,16 +6,11 @@ jobs:
   validate_and_build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Prep docs (copy README -> source/html/index.md)
-        run: |
-          mkdir -p source/html
-          cp README.md source/html/index.md
-          sed -i 's|source/|../|g' source/html/index.md
-
       - name: Validate and Build
-        uses: typemytype/roboFont-Extension-action@v0.1.0
+        uses: yourname/roboFont-Extension-action@main
         with:
           autotagging: true
+          prebuild: |
+            mkdir -p source/html
+            cp README.md source/html/index.md
+            sed -i 's|source/|../|g' source/html/index.md
