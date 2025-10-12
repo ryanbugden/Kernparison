@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Validate and Build
-        uses: yourname/roboFont-Extension-action@main
+        uses: ryanbugden/roboFont-Extension-action@main
         with:
           autotagging: true
           prebuild: |
