@@ -205,7 +205,7 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
                     text=str(get_kern_value(font, self.pair)),
                     acceptsHit=False,
                 )
-                # Kerning pair itself
+                # Kerning pair drawing
                 kern_pair_sublayer = self.grid_container.appendBaseSublayer(
                     position=(0, 0),
                     size=(0, 0),
