@@ -19,4 +19,4 @@ A RoboFont extension for comparing how you kerned the current pair across your w
 ## Acknowledgments
 
 - Development of Kernparison was sponsored by Hannes Famira.
-- Built with RoboFont, EZUI, Merz, Subscriber. Thanks to Frederik Berlaen & Tal Leming.
+- Built with RoboFont, EZUI, Merz, Subscriber. Thank you to Frederik Berlaen & Tal Leming.
