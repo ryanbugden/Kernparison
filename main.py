@@ -7,6 +7,7 @@ import merz
 from mojo.subscriber import Subscriber
 from fontTools.misc.fixedTools import otRound
 from mojo.events import addObserver, removeObserver
+from mojo.UI import Message
 import metricsMachine as mm
 
 
@@ -244,5 +245,12 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
         
     
 if __name__ == '__main__':
-    OpenKernparison(ufo_operator=CurrentDesignspace())
+    if CurrentDesignspace():
+        OpenKernparison(ufo_operator=CurrentDesignspace())
+    else:
+        Message(
+            title="Kernparison",
+            message="Open a Designspace",
+            informativeText="Please open a .designspace file before opening Kernparison."
+        )
     
