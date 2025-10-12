@@ -7,7 +7,7 @@ import merz
 from mojo.subscriber import Subscriber
 from fontTools.misc.fixedTools import otRound
 from mojo.events import addObserver, removeObserver
-from mojo.UI import Message
+from mojo.UI import Message, GetFile
 import metricsMachine as mm
 
 
@@ -227,8 +227,6 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
                     x_advance = glyph_width + pair_advance
                     pair_width += x_advance
                     pair_i += 1
-                if self.pair == ("quotedbl", "four"):
-                    print(glyph_width, pair_advance, pair_width)
                 scale = uh/font.info.unitsPerEm * 2/3
                 if scale*pair_width > uw:
                     width_exceeds = True
@@ -246,11 +244,15 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
     
 if __name__ == '__main__':
     if CurrentDesignspace():
-        OpenKernparison(ufo_operator=CurrentDesignspace())
+        OpenKernparison(CurrentDesignspace())
     else:
-        Message(
-            title="Kernparison",
-            message="Open a Designspace",
-            informativeText="Please open a .designspace file before opening Kernparison."
-        )
+        path = GetFile(
+            message="Please choose a .designspace file for use with Kernparison.", 
+            title="Open a Designspace", 
+            allowsMultipleSelection=False, 
+            fileTypes=["designspace"]
+            )
+        if path:
+            ufo_operator = OpenDesignspace(path, showInterface=False)
+            OpenKernparison(ufo_operator)
     

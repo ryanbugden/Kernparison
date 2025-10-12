@@ -1,0 +1,14 @@
+name: Kernparison
+developer: Ryan Bugden
+developerURL: http://ryanbugden.com
+launchAtStartUp: false
+mainScript: main.py
+version: 0.1
+addToMenu:
+- path: main.py
+  preferredName: Kernparison
+  shortKey: ""
+html: true
+timeStamp: 1760289763
+requiresVersionMajor: '4'
+requiresVersionMinor: '5'
