@@ -1,7 +1,7 @@
 # Kernparison
 A RoboFont extension for comparing how you kerned the current pair across your whole Designspace.
 
-![](source/resources/ui-main.png)
+![](../resources/ui-main.png)
 
 ## Functionality
 

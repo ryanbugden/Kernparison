@@ -158,6 +158,12 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
                 if i + 1 > font_count:
                     continue
                 font = self.fonts[i]
+                # Calculate slant offset, to help center slanted styles in the cell.
+                slant_offset_key = 'com.typemytype.robofont.italicSlantOffset'
+                if slant_offset_key in font.lib.keys(): 
+                    slant_offset = font.lib[slant_offset_key]
+                else:
+                    slant_offset = 0
                 pair_value = get_kern_value(font, self.pair)
                 black_or_white = (0,0,0,1) if not inDarkMode() else (1,1,1,1)
                 kern_fill_color = black_or_white
@@ -211,10 +217,12 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
                     size=(0, 0),
                     acceptsHit=False,
                 )
-                x_advance = 0
+                x_advance = slant_offset
                 pair_width = 0
                 pair_i = 0
                 for glyph_name in self.pair:
+                    if glyph_name not in font:
+                        continue
                     glyph = font[glyph_name]
                     glyph_path = glyph.getRepresentation("merz.CGPath")
                     glyph_path_layer = kern_pair_sublayer.appendPathSublayer(
@@ -225,7 +233,7 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
                     glyph_path_layer.setPath(glyph_path)
                     glyph_width = glyph.width if glyph.width is not None else 0
                     pair_advance = pair_value if pair_value is not None and pair_i == 0 else 0
-                    x_advance = glyph_width + pair_advance
+                    x_advance = glyph_width + pair_advance + slant_offset
                     pair_width += x_advance
                     pair_i += 1
                 scale = uh/font.info.unitsPerEm * 2/3
@@ -237,7 +245,7 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
                 i += 1
         # Determine how to scale and place the kerning pair
         if width_exceeds:
-            scale = uw/max_pair_width * .95
+            scale = uw/max_pair_width * .90
         for kern_pair_sublayer, pair_width, (x, y) in kern_pair_sublayers:
             kern_pair_sublayer.addTranslationTransformation((x + (uw-scale*pair_width)/2, y + ((uh-50) - font.info.capHeight*scale) / 2 + 50))
             kern_pair_sublayer.addScaleTransformation(scale)
