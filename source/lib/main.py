@@ -1,14 +1,20 @@
 # menuTitle: Kernparison
 
-from random import randint 
+
 import math
 import ezui
 import merz
-from mojo.subscriber import Subscriber
 from fontTools.misc.fixedTools import otRound
+from mojo.subscriber import Subscriber
 from mojo.events import addObserver, removeObserver
 from mojo.UI import Message, GetFile, inDarkMode
 import metricsMachine as mm
+
+
+'''
+Ryan Bugden
+October 2025
+'''
 
 
 class KernparisonError(Exception): pass
