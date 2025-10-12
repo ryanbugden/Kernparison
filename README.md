@@ -1,3 +1,5 @@
+<img src="source/resources/mechanic_icon.png"  width="80">
+
 # Kernparison
 A RoboFont extension for comparing how you kerned the current pair across your whole Designspace.
 
