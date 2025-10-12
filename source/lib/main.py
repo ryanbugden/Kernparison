@@ -7,7 +7,7 @@ import merz
 from mojo.subscriber import Subscriber
 from fontTools.misc.fixedTools import otRound
 from mojo.events import addObserver, removeObserver
-from mojo.UI import Message, GetFile
+from mojo.UI import Message, GetFile, inDarkMode
 import metricsMachine as mm
 
 
@@ -159,7 +159,8 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
                     continue
                 font = self.fonts[i]
                 pair_value = get_kern_value(font, self.pair)
-                kern_fill_color = (0,0,0,1)
+                black_or_white = (0,0,0,1) if not inDarkMode() else (1,1,1,1)
+                kern_fill_color = black_or_white
                 kern_bg_color = (1,1,1,0)
                 if pair_value is not None:
                     if pair_value < 0:
@@ -189,7 +190,7 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
                         y + 20
                         ),
                     pointSize=10,
-                    fillColor=(0,0,0,1),
+                    fillColor=black_or_white,
                     horizontalAlignment="center",
                     text=f"{font.info.styleName}",
                     acceptsHit=False,
@@ -217,7 +218,7 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
                     glyph = font[glyph_name]
                     glyph_path = glyph.getRepresentation("merz.CGPath")
                     glyph_path_layer = kern_pair_sublayer.appendPathSublayer(
-                        fillColor=(0, 0, 0, 1),
+                        fillColor=black_or_white,
                         acceptsHit=False,
                         )            
                     glyph_path_layer.addTranslationTransformation((x_advance, 0))
