@@ -258,8 +258,13 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
         
     
 if __name__ == '__main__':
+    f = CurrentFont()
+    ds_key = "public.designspaces"
     if CurrentDesignspace():
         OpenKernparison(CurrentDesignspace())
+    elif f is not None and ds_key in f.lib and len(f.lib[ds_key]) > 0:
+        ufo_operator = OpenDesignspace(f.lib[ds_key][0], showInterface=False)
+        OpenKernparison(ufo_operator)
     else:
         path = GetFile(
             message="Please choose a .designspace file for use with Kernparison.", 
