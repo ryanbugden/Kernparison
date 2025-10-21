@@ -3,6 +3,8 @@
 # Kernparison
 A RoboFont extension for comparing how you kerned the current pair across your whole Designspace.
 
+© Ryan Bugden, 2025
+
 ![](source/resources/ui-main.png)
 
 ## Functionality
@@ -13,10 +15,13 @@ A RoboFont extension for comparing how you kerned the current pair across your w
 	- As you kern in Metrics Machine, Kernparison, will show that active pair. If the UFO you’re working on is one of the sources in Kernparison, it will update as you kern it.
 	- Positive kerns are green. Negative kerns are red. 0 is neutral.
 - Double-click a cell to open that UFO.
-- Uses the current designspace you have open in Designspace Editor. If you don’t have a designspace open already, and if you don’t already have a designspace linked to your UFO (with [Designspace Manager](https://github.com/ryanbugden/Designspace-Manager) or simply using `font.lib['public.designspaces']`. Kernparison will prompt you to choose a path to a designspace file.
+- Kernparison will try to open a designspace in this order:
+	1. The current designspace you have open in Designspace Editor. 
+	2. The first designspace linked to your UFO (with [Designspace Manager](https://github.com/ryanbugden/Designspace-Manager) or simply using `font.lib['public.designspaces']`. 
+	3. Or it will prompt you to choose a path to a designspace file.
 
 
-© Ryan Bugden, 2025
+
 
 ## Acknowledgments
 
