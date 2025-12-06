@@ -3,7 +3,7 @@ developer: Ryan Bugden
 developerURL: http://ryanbugden.com
 launchAtStartUp: false
 mainScript: main.py
-version: 0.3
+version: 0.4
 addToMenu:
 - path: main.py
   preferredName: Kernparison

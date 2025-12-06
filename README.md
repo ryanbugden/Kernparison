@@ -14,7 +14,9 @@ A RoboFont extension for comparing how you kerned the current pair across your w
 	- As window is resized, Kernparison will make the most optimal layout for maximum visibility.
 	- As you kern in Metrics Machine, Kernparison, will show that active pair. If the UFO you’re working on is one of the sources in Kernparison, it will update as you kern it.
 	- Positive kerns are green. Negative kerns are red. 0 is neutral.
+	- Exceptions are indicated by the kerning value being outlined.
 - Double-click a cell to open that UFO.
+- `Command –/+` to make the pairs smaller or larger.
 - Kernparison will try to open a designspace in this order:
 	1. The current designspace you have open in Designspace Editor. 
 	2. The first designspace linked to your UFO (with [Designspace Manager](https://github.com/ryanbugden/Designspace-Manager) or simply using `font.lib['public.designspaces']`. 

@@ -25,14 +25,12 @@ def OpenKernparison(ufo_operator=None):
     
 def get_kern_value(f, pair):
     '''Given a pair consisting of glyph names, return the kerning value.'''
-    l, r = pair
-    for group_name in f.groups.findGlyph(l):
-        if "kern1" in group_name:
-            l = group_name
-    for group_name in f.groups.findGlyph(r):
-        if "kern2" in group_name:
-            r = group_name
-    return f.kerning.get((l, r))
+    return f.kerning.find(pair)
+
+def check_exception(f, pair):
+    '''Given a pair consisting of glyph names, return whether it’s an exception.'''
+    return mm.MetricsMachineFont(f).kerning.isException(pair)
+
     
     
 class KernparisonWindowController(Subscriber, ezui.WindowController):
@@ -69,13 +67,17 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
             title=title,
             # margins=(0, 0, 0, 0),
             size=(500, 500),
-            minSize=(500, 500)
+            minSize=(400, 400)
         )
+        addObserver(self, 'currentPairChanged', 'MetricsMachine.currentPairChanged')
         self.grid_view = self.w.getItem("gridView")
         self.grid_container = self.grid_view.getMerzContainer()
         self.grid_item_container = self.grid_container.appendBaseSublayer(name="gridItemContainer")
         self.grid_container.setContainerScale(1.0)
-        addObserver(self, 'currentPairChanged', 'MetricsMachine.currentPairChanged')
+        # Scales for kerning pair itself. 
+        # First is the desired height relative to the vertical space
+        # Second is the desired width if it needs to snap smaller.
+        self.scales = (0.7, 0.9)  
         
     def started(self):
         self.w.open()
@@ -89,6 +91,9 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
         
     def currentPairChanged(self, sender):
         self.pair = sender['pair']
+        self.build_cells()
+        
+    def roboFontAppearanceChanged(self, info):
         self.build_cells()
         
     # Set up double-click behavior: open selected UFO
@@ -125,12 +130,24 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
         hit_name = hit.getName()
         if hit_name is not None:
             hit.setBorderWidth(2)
-            # hit.setBackgroundColor((0,0,1,0.5))
             if click_count == 2:
                 i = int(hit_name)
                 # Open font
                 font = self.fonts[i]
                 font.openInterface()
+                
+    def keyDown(self, view, event):
+        """Scale the kerning pair preview up or down."""
+        event = merz.unpackEvent(event)
+        if event["modifiers"] != ["command"]:
+            return
+        char = event["character"]
+        step = 0.1
+        direction = -1 if char == "-" else 1
+        new_scales = tuple(s + direction * step for s in self.scales)
+        if all(0.1 <= s <= 0.9 for s in new_scales):
+            self.scales = new_scales
+            self.build_cells()
         
     def build_cells(self):
         '''Builds/rebuilds the cells from the ground up.'''
@@ -208,15 +225,20 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
                     acceptsHit=False,
                 )
                 # Kerning value text
-                self.grid_container.appendTextLineSublayer(
-                    position=(x + uw/2, y + 40),
+                kerning_value_text = str(get_kern_value(font, self.pair))
+                kerning_value = self.grid_container.appendTextLineSublayer(
+                    position=(x + uw/2, y + 45),
                     pointSize=12,
                     weight="bold",
                     fillColor=kern_fill_color,
                     horizontalAlignment="center",
-                    text=str(get_kern_value(font, self.pair)),
+                    text=kerning_value_text,
                     acceptsHit=False,
-                )
+                    borderWidth=1.5 if check_exception(font, self.pair) else 0,
+                    borderColor=kern_fill_color if check_exception(font, self.pair) else (1,1,1,0),
+                    cornerRadius=5,
+                    padding=(8, 1),
+                )   
                 # Kerning pair drawing
                 kern_pair_sublayer = self.grid_container.appendBaseSublayer(
                     position=(0, 0),
@@ -242,8 +264,8 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
                     x_advance = glyph_width + pair_advance + slant_offset
                     pair_width += x_advance
                     pair_i += 1
-                scale = uh/font.info.unitsPerEm * 2/3
-                if scale*pair_width > uw:
+                scale = uh/font.info.unitsPerEm * self.scales[0]
+                if scale*pair_width > uw * self.scales[1]:
                     width_exceeds = True
                 kern_pair_sublayers.append((kern_pair_sublayer, pair_width, (x, y)))
                 max_pair_width = pair_width if pair_width > max_pair_width else max_pair_width
@@ -251,7 +273,7 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
                 i += 1
         # Determine how to scale and place the kerning pair
         if width_exceeds:
-            scale = uw/max_pair_width * .90
+            scale = uw/max_pair_width * self.scales[1]
         for kern_pair_sublayer, pair_width, (x, y) in kern_pair_sublayers:
             kern_pair_sublayer.addTranslationTransformation((x + (uw-scale*pair_width)/2, y + ((uh-50) - font.info.capHeight*scale) / 2 + 50))
             kern_pair_sublayer.addScaleTransformation(scale)
