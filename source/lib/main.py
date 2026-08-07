@@ -221,13 +221,6 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
     debug = False
 
     def build(self, designspace=None):
-        self.designspace = designspace
-        self.designspace_options = [path for path in Path(designspace.path).parent.glob("*.designspace")]
-        # Load the sources of the designspace as font objects in memory
-        self.fonts = [
-            OpenFont(source.path, showInterface=False)
-            for source in self.designspace.sources
-        ]
         # Try to get the current pair from MetricsMachine on extension launch
         try:
             self.pair = mm.GetCurrentPair()
@@ -235,9 +228,14 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
             self.pair = ("A", "V")
 
         content = """
+        (One ...)   @designspace
         * MerzView  @gridView
         """
         descriptionData = dict(
+            designspace=dict(
+                width="fill",
+                items=[],
+            ),
             gridView=dict(
                 backgroundColor=(1, 1, 1, 0),
                 width=">=300",
@@ -267,6 +265,7 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
         # First is the desired height relative to the vertical space
         # Second is the desired width if it needs to snap smaller.
         self.scales = (0.7, 0.9)
+        self.update_ds(designspace)
 
     def started(self):
         self.w.open()
@@ -274,6 +273,26 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
 
     def destroy(self):
         removeObserver(self, "MetricsMachine.currentPairChanged")
+
+    def designspaceCallback(self, sender):
+        index = sender.get()
+        # Other
+        if index == len(sender.getItems()) - 1:
+            path = GetFile(
+                message="Please choose a .designspace file for use with Kernparison.",
+                title="Open a Designspace",
+                directory=str(Path(CurrentFont().path).parent),
+                allowsMultipleSelection=False,
+                fileTypes=["designspace"],
+            )
+            ds = OpenDesignspace(path, showInterface=False)
+            self.update_ds(ds)
+            self.build_cells()
+        else:
+            path = self.designspace_paths[index]
+            ds = OpenDesignspace(path, showInterface=False)
+            self.update_ds(ds)
+            self.build_cells()
 
     def windowDidResize(self, sender):
         self.build_cells()
@@ -375,6 +394,22 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
         if all(0.1 <= s <= 0.9 for s in new_scales):
             self.scales = new_scales
             self.build_cells()
+
+    def update_ds(self, designspace):
+        self.designspace = designspace
+        self.designspace_paths = list(
+            Path(designspace.path).parent.glob("*.designspace")
+        )
+        self.designspace_options = [
+            path.name
+            for path in self.designspace_paths
+        ] + ["---", "Other..."]
+        self.w.getItem("designspace").setItems(self.designspace_options)
+        # Load the sources of the designspace as font objects in memory
+        self.fonts = [
+            OpenFont(source.path, showInterface=False)
+            for source in self.designspace.sources
+        ]
 
     def build_cells(self):
         """Builds/rebuilds the cells from the ground up."""
