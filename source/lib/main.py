@@ -1,14 +1,15 @@
 # menuTitle: Kernparison
 
 
+from pathlib import Path
+from fontTools.misc.fixedTools import otRound
 import ezui
 import merz
-from fontTools.misc.fixedTools import otRound
 from mojo.subscriber import Subscriber
 from mojo.events import addObserver, removeObserver
 from mojo.UI import GetFile, inDarkMode
 import metricsMachine as mm
-from pathlib import Path
+from mm4.interface.documentWindow import MMDocumentWindowController
 
 
 """
@@ -21,8 +22,8 @@ class KernparisonError(Exception):
     pass
 
 
-def OpenKernparison(ufo_operator=None):
-    Kernparison = KernparisonWindowController(ufo_operator=ufo_operator)
+def OpenKernparison(designspace=None):
+    Kernparison = KernparisonWindowController(designspace=designspace)
     return Kernparison
 
 
@@ -36,15 +37,25 @@ def check_exception(f, pair):
     return mm.MetricsMachineFont(f).kerning.isException(pair)
 
 
+def open_font_in_mm(font):
+    font = OpenFont(font.path, showInterface=True)
+
+    controller = MMDocumentWindowController(font.naked())
+    controller.assignToDocument(font.document())
+
+    return font, controller
+
+
 class KernparisonWindowController(Subscriber, ezui.WindowController):
     debug = False
 
-    def build(self, ufo_operator=None):
-        self.ufo_operator = ufo_operator
+    def build(self, designspace=None):
+        self.designspace = designspace
+        self.designspace_options = [path for path in Path(designspace.path).parent.glob(".designspace")]
         # Load the sources of the designspace as font objects in memory
         self.fonts = [
             OpenFont(source.path, showInterface=False)
-            for source in self.ufo_operator.sources
+            for source in self.designspace.sources
         ]
         # Try to get the current pair from MetricsMachine on extension launch
         try:
@@ -89,6 +100,7 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
     def started(self):
         self.w.open()
         self.build_cells()
+        print(self.designspace_options)
 
     def destroy(self):
         removeObserver(self, "MetricsMachine.currentPairChanged")
@@ -141,9 +153,20 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
             hit.setBorderWidth(2)
             if click_count == 2:
                 i = int(hit_name)
-                # Open font
-                font = self.fonts[i]
-                font.openInterface()
+                old_font = self.fonts[i]
+                # Do nothing if this font is already the current font
+                current_font = CurrentFont()
+                if current_font is not None and current_font.path == old_font.path:
+                    return
+                # Preserve pair before MM opening fires notifications
+                pair = self.pair
+                new_font, controller = open_font_in_mm(old_font)
+                self.fonts[i] = new_font
+                if old_font is not new_font:
+                    old_font.close()
+                mm.SetCurrentPair(pair, font=new_font)
+                # Restore internal pair reference
+                self.pair = pair
 
     def keyDown(self, view, event):
         """Scale the kerning pair preview up or down."""
@@ -241,9 +264,7 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
                     text=kerning_value_text,
                     acceptsHit=False,
                     borderWidth=1.5 if check_exception(font, self.pair) else 0,
-                    borderColor=kern_fill_color
-                    if check_exception(font, self.pair)
-                    else (1, 1, 1, 0),
+                    borderColor=kern_fill_color if check_exception(font, self.pair) else (1, 1, 1, 0),
                     cornerRadius=5,
                     padding=(8, 1),
                 )
@@ -298,12 +319,8 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
 
 if __name__ == "__main__":
     f = CurrentFont()
-    ds_key = "public.designspaces"
     if CurrentDesignspace():
         OpenKernparison(CurrentDesignspace())
-    elif f is not None and ds_key in f.lib and len(f.lib[ds_key]) > 0:
-        ufo_operator = OpenDesignspace(f.lib[ds_key][0], showInterface=False)
-        OpenKernparison(ufo_operator)
     else:
         path = GetFile(
             message="Please choose a .designspace file for use with Kernparison.",
@@ -313,5 +330,5 @@ if __name__ == "__main__":
             fileTypes=["designspace"],
         )
         if path:
-            ufo_operator = OpenDesignspace(path, showInterface=False)
-            OpenKernparison(ufo_operator)
+            designspace = OpenDesignspace(path, showInterface=False)
+            OpenKernparison(designspace)
