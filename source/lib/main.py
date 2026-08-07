@@ -86,13 +86,14 @@ class MiniKernerPopoverController(ezui.WindowController):
         kern_value = 0 if kern_value is None else int(kern_value)
 
         content = """
-        * HorizontalStack    @horizontalStack
-        > l                  @emptyLabel1
+        * HorizontalStack              @horizontalStack
+        > l                            @emptyLabel1
         > * HorizontalStack
-        >> [_ _]             @kernValue
-        >> (Save)            @saveButton
-        > l                  @emptyLabel2
-        * MerzView           @preview
+        >> [_ _]                       @kernValue
+        >> (Save)                      @saveButton
+        >> (Copy into Current Font)    @copyButton
+        > l                            @emptyLabel2
+        * MerzView                     @preview
         """
 
         description_data = dict(
@@ -210,6 +211,10 @@ class MiniKernerPopoverController(ezui.WindowController):
         self.font.save()
         self.controller.build_cells()
         self.w.close()
+
+    def copyButtonCallback(self, sender):
+        kern_value = self.w.getItem("kernValue").get()
+        CurrentFont().kerning[convert_to_group_pair(self.font, self.pair)] = kern_value
 
 
 class KernparisonWindowController(Subscriber, ezui.WindowController):
