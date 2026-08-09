@@ -1,6 +1,7 @@
 # menuTitle: Kernparison
 
 
+from AppKit import NSEventModifierFlagControl
 from pathlib import Path
 import unicodedata
 from fontTools.misc.fixedTools import otRound
@@ -331,34 +332,7 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
         )
         return (x, y)
 
-    def mouseDown(self, view, event):
-        self.build_cells()
-        event = merz.unpackEvent(event)
-        click_count = event["clickCount"]
-        (x, y) = self._convert_location(event)
-        hit = self._get_item_at_event((x, y))
-        hit_name = hit.getName()
-        if hit_name is not None:
-            hit.setBorderWidth(2)
-            if click_count == 2:
-                i = int(hit_name)
-                old_font = self.fonts[i]
-                # Do nothing if this font is already the current font
-                current_font = CurrentFont()
-                if current_font is not None and current_font.path == old_font.path:
-                    return
-                # Preserve pair before MM opening fires notifications
-                pair = self.pair
-                new_font, controller = open_font_in_mm(old_font)
-                self.fonts[i] = new_font
-                if old_font is not new_font:
-                    old_font.close()
-                mm.SetCurrentPair(pair, font=new_font)
-                # Restore internal pair reference
-                self.pair = pair
-
-    def rightMouseDown(self, view, event):
-        self.build_cells()
+    def _show_kerning_popover(self, event):
         event = merz.unpackEvent(event)
         x, y = self._convert_location(event)
         hit = self._get_item_at_event((x, y))
@@ -382,18 +356,61 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
             location,
         )
 
-    def keyDown(self, view, event):
-        """Scale the kerning pair preview up or down."""
-        event = merz.unpackEvent(event)
-        if event["modifiers"] != ["command"]:
-            return
-        char = event["character"]
-        step = 0.1
-        direction = -1 if char == "-" else 1
-        new_scales = tuple(s + direction * step for s in self.scales)
-        if all(0.1 <= s <= 0.9 for s in new_scales):
-            self.scales = new_scales
+    def mouseDown(self, view, event):
+        # Treat Control-click like right-click.
+        if event.modifierFlags() & NSEventModifierFlagControl:
             self.build_cells()
+            self._show_kerning_popover(event)
+            return
+
+        self.build_cells()
+        unpacked_event = merz.unpackEvent(event)
+
+        click_count = unpacked_event["clickCount"]
+        x, y = self._convert_location(unpacked_event)
+        hit = self._get_item_at_event((x, y))
+
+        if hit is None:
+            return
+
+        hit_name = hit.getName()
+        if hit_name is not None:
+            hit.setBorderWidth(2)
+
+            if click_count == 2:
+                i = int(hit_name)
+                old_font = self.fonts[i]
+
+                current_font = CurrentFont()
+                if current_font is not None and current_font.path == old_font.path:
+                    return
+
+                pair = self.pair
+                new_font, controller = open_font_in_mm(old_font)
+                self.fonts[i] = new_font
+
+                if old_font is not new_font:
+                    old_font.close()
+
+                mm.SetCurrentPair(pair, font=new_font)
+                self.pair = pair
+
+    def rightMouseDown(self, view, event):
+        self.build_cells()
+        self._show_kerning_popover(event)
+
+        def keyDown(self, view, event):
+            """Scale the kerning pair preview up or down."""
+            event = merz.unpackEvent(event)
+            if event["modifiers"] != ["command"]:
+                return
+            char = event["character"]
+            step = 0.1
+            direction = -1 if char == "-" else 1
+            new_scales = tuple(s + direction * step for s in self.scales)
+            if all(0.1 <= s <= 0.9 for s in new_scales):
+                self.scales = new_scales
+                self.build_cells()
 
     def update_ds(self, designspace):
         self.designspace = designspace
