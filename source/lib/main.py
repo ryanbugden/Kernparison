@@ -107,12 +107,10 @@ class MiniKernerPopoverController(ezui.WindowController):
 
         content = """
         * HorizontalStack              @horizontalStack
-        > l                            @emptyLabel1
         > * HorizontalStack
         >> [_ _]                       @kernValue
         >> (Save)                      @saveButton
         >> (Copy into Current Font)    @copyButton
-        > l                            @emptyLabel2
         * MerzView                     @preview
         """
 
@@ -120,16 +118,21 @@ class MiniKernerPopoverController(ezui.WindowController):
             horizontalStack=dict(
                 width="fill",
                 alignment="center",
-                distribution="equalCentering"
+                distribution="gravity"
             ),
             kernValue=dict(
                 value=kern_value,
                 valueType="integer",
                 valueIncrement=5,
                 width=60,
+                gravity="leading",
             ),
             saveButton=dict(
-                width=80
+                width=80,
+                gravity="leading",
+            ),
+            copyButton=dict(
+                gravity="trailing",
             ),
             preview=dict(
                 width="fill",
@@ -146,8 +149,6 @@ class MiniKernerPopoverController(ezui.WindowController):
         self.w.getItem("saveButton").bind("\r", [])
         self.preview = self.w.getItem("preview")
         self.preview_container = self.preview.getMerzContainer()
-        for identifier in ("emptyLabel1", "emptyLabel2"):
-            self.w.getItem(identifier).show(False)
 
     def started(self):
         self.w.open(
