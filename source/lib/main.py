@@ -414,18 +414,28 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
 
     def update_ds(self, designspace):
         self.designspace = designspace
+
+        current_path = Path(designspace.path).resolve()
         self.designspace_paths = list(
-            Path(designspace.path).parent.glob("*.designspace")
+            current_path.parent.glob("*.designspace")
         )
+
         self.designspace_options = [
             path.name
             for path in self.designspace_paths
         ] + ["---", "Other..."]
-        self.w.getItem("designspace").setItems(self.designspace_options)
-        # Load the sources of the designspace as font objects in memory
+
+        popup = self.w.getItem("designspace")
+        popup.setItems(self.designspace_options)
+
+        for i, path in enumerate(self.designspace_paths):
+            if path.resolve() == current_path:
+                popup.set(i)
+                break
+
         self.fonts = [
             OpenFont(source.path, showInterface=False)
-            for source in self.designspace.sources
+            for source in designspace.sources
         ]
 
     def build_cells(self):
