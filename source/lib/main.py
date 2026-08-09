@@ -37,6 +37,13 @@ def check_designspace_sources(designspace):
     return False
 
 
+def find_designspace_paths(path):
+    """Find designspaces next to a file or package path."""
+    path = Path(path).resolve()
+    directory = path.parent if path.suffix else path
+    return sorted(directory.glob("*.designspace"))
+
+
 class KernparisonError(Exception):
     pass
 
@@ -90,7 +97,6 @@ def open_font_in_mm(font):
     controller.assignToDocument(font.document())
 
     return font, controller
-
 
 
 class MiniKernerPopoverController(ezui.WindowController):
@@ -295,6 +301,13 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
     def destroy(self):
         removeObserver(self, "MetricsMachine.currentPairChanged")
 
+    def set_designspace_selection(self):
+        current_path = Path(self.designspace.path).resolve()
+        for i, path in enumerate(self.designspace_paths):
+            if path.resolve() == current_path:
+                self.w.getItem("designspace").set(i)
+                break
+
     def designspaceCallback(self, sender):
         index = sender.get()
         # Other
@@ -439,9 +452,7 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
         self.designspace = designspace
 
         current_path = Path(designspace.path).resolve()
-        self.designspace_paths = list(
-            current_path.parent.glob("*.designspace")
-        )
+        self.designspace_paths = find_designspace_paths(current_path)
 
         self.designspace_options = [
             path.name
@@ -450,11 +461,7 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
 
         popup = self.w.getItem("designspace")
         popup.setItems(self.designspace_options)
-
-        for i, path in enumerate(self.designspace_paths):
-            if path.resolve() == current_path:
-                popup.set(i)
-                break
+        self.set_designspace_selection()
 
         self.fonts = [
             OpenFont(source.path, showInterface=False)
@@ -604,13 +611,17 @@ if __name__ == "__main__":
     elif CurrentDesignspace():
         OpenKernparison(CurrentDesignspace())
     else:
-        path = GetFile(
-            message="Please choose a .designspace file for use with Kernparison.",
-            title="Open a Designspace",
-            directory=str(Path(f.path).parent),
-            allowsMultipleSelection=False,
-            fileTypes=["designspace"],
-        )
+        designspace_paths = find_designspace_paths(f.path)
+        if designspace_paths:
+            path = designspace_paths[0]
+        else:
+            path = GetFile(
+                message="Please choose a .designspace file for use with Kernparison.",
+                title="Open a Designspace",
+                directory=str(Path(f.path).parent),
+                allowsMultipleSelection=False,
+                fileTypes=["designspace"],
+            )
         if path:
             designspace = OpenDesignspace(path, showInterface=False)
             OpenKernparison(designspace)
