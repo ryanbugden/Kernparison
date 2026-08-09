@@ -21,11 +21,29 @@ October 2025
 """
 
 
+def check_designspace_sources(designspace):
+    missing = []
+    for source in designspace.sources:
+        if source.path is None or not Path(source.path).exists():
+            missing.append(source.filename or source.name or "Unknown source")
+    if not missing:
+        return True
+    missing_text = "\n".join(f"{path}" for path in missing)
+    Message(
+        "Some fonts in this designspace could not be found.",
+        informativeText=missing_text,
+        alertStyle="critical",
+    )
+    return False
+
+
 class KernparisonError(Exception):
     pass
 
 
 def OpenKernparison(designspace=None):
+    if not check_designspace_sources(designspace):
+        return None
     Kernparison = KernparisonWindowController(designspace=designspace)
     return Kernparison
 
@@ -72,6 +90,7 @@ def open_font_in_mm(font):
     controller.assignToDocument(font.document())
 
     return font, controller
+
 
 
 class MiniKernerPopoverController(ezui.WindowController):
@@ -286,14 +305,17 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
                 allowsMultipleSelection=False,
                 fileTypes=["designspace"],
             )
+            if not path:
+                return
             ds = OpenDesignspace(path, showInterface=False)
-            self.update_ds(ds)
-            self.build_cells()
         else:
             path = self.designspace_paths[index]
             ds = OpenDesignspace(path, showInterface=False)
-            self.update_ds(ds)
-            self.build_cells()
+        if not check_designspace_sources(ds):
+            self.set_designspace_selection()
+            return
+        self.update_ds(ds)
+        self.build_cells()
 
     def windowDidResize(self, sender):
         self.build_cells()
@@ -399,18 +421,18 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
         self.build_cells()
         self._show_kerning_popover(event)
 
-        def keyDown(self, view, event):
-            """Scale the kerning pair preview up or down."""
-            event = merz.unpackEvent(event)
-            if event["modifiers"] != ["command"]:
-                return
-            char = event["character"]
-            step = 0.1
-            direction = -1 if char == "-" else 1
-            new_scales = tuple(s + direction * step for s in self.scales)
-            if all(0.1 <= s <= 0.9 for s in new_scales):
-                self.scales = new_scales
-                self.build_cells()
+    def keyDown(self, view, event):
+        """Scale the kerning pair preview up or down."""
+        event = merz.unpackEvent(event)
+        if event["modifiers"] != ["command"]:
+            return
+        char = event["character"]
+        step = 0.1
+        direction = -1 if char == "-" else 1
+        new_scales = tuple(s + direction * step for s in self.scales)
+        if all(0.1 <= s <= 0.9 for s in new_scales):
+            self.scales = new_scales
+            self.build_cells()
 
     def update_ds(self, designspace):
         self.designspace = designspace
