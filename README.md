@@ -23,11 +23,10 @@ A RoboFont extension for comparing how you kerned the current pair across your w
 
    1. Right click (or control-click) the source’s cell. A little window should come up with a preview of the pair. You can quickly change the kerning pair in that other source. Want to remove the kern value from the kerning data? Clear the text field and click **Save**.
 
-      >  [!NOTE] 
       > You must click **Save** to commit that kern value and save the source UFO. This will also update the preview of the source in Kernparison as well as all affected instances.
    
    3. You may also want to copy that kern value into your main kerning session. Clicking **Copy into Current Font** takes the value in the text box and applies that kern value to the current pair in the current font in RoboFont.
-      >  [!NOTE] 
+
       > **Copy into Current Font** does not save the current font automatically.
    
 7. Need to really get into that source bigtime? Double-click the cell to open the UFO and the current pair in MetricsMachine.
