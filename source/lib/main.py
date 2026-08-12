@@ -16,6 +16,22 @@ import metricsMachine as mm
 from mm4.interface.documentWindow import MMDocumentWindowController
 
 
+def new_alpha(color, alpha):
+    r, g, b, a = color
+    return (r, g, b, alpha)
+
+
+def get_axis_location(descriptor):
+    """
+    Returns the axis location, however it manifests itself.
+    """
+    for attr in ("location", "userLocation", "designLocation"):
+        value = getattr(descriptor, attr, None)
+        if value:
+            return value
+    return {}
+
+
 def check_designspace_sources(designspace):
     missing = []
     for source in designspace.sources:
@@ -37,6 +53,14 @@ def find_designspace_paths(path):
     path = Path(path).resolve()
     directory = path.parent if path.suffix else path
     return sorted(directory.glob("*.designspace"))
+
+
+def find_designspace_for_font(font, designspace_paths):
+    for ds_path in designspace_paths:
+        ds = OpenDesignspace(ds_path, showInterface=False)
+        if font.path in {source.path for source in ds.sources}:
+            return ds.path
+        ds.close()
 
 
 class KernparisonError(Exception):
@@ -95,7 +119,6 @@ def open_font_in_mm(font):
 
 
 class MiniKernerPopoverController(ezui.WindowController):
-
     def build(self, controller, parent, font, pair, location):
         self.controller = controller
         self.parent = parent
@@ -122,7 +145,7 @@ class MiniKernerPopoverController(ezui.WindowController):
             horizontalStack=dict(
                 width="fill",
                 alignment="center",
-                distribution="gravity"
+                distribution="gravity",
             ),
             kernValue=dict(
                 value=self.temp_kern_value,
@@ -237,6 +260,8 @@ class MiniKernerPopoverController(ezui.WindowController):
         # Save the desired kern value into that font document
         self.set_kerning(self.font, self.pair, self.temp_kern_value)
         self.font.save()
+        self.controller.designspace.updateFonts([self.font])
+        self.controller.update_fonts()
         self.controller.build_cells()
         self.w.close()
 
@@ -269,10 +294,15 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
             self.pair = ("A", "V")
 
         content = """
-        (One ...)   @designspace
-        * MerzView  @gridView
+        * HorizontalStack     @stack
+        > (One ...)           @designspace
+        > [ ] Show Instances  @showInstancesCheckbox
+        * MerzView            @gridView
         """
         descriptionData = dict(
+            stack=dict(
+                distribution="gravity",
+            ),
             designspace=dict(
                 width="fill",
                 items=[],
@@ -282,20 +312,22 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
                 width=">=300",
                 height=">=300",
                 delegate=self,
-            )
+            ),
+            showInstancesCheckbox=dict(
+                gravity="trailing",
+            ),
         )
-        title = "Kernparison"
-
         self.w = ezui.EZWindow(
             content=content,
             descriptionData=descriptionData,
             controller=self,
-            title=title,
+            title="Kernparison",
             # margins=(0, 0, 0, 0),
             size=(500, 500),
             minSize=(400, 400),
         )
         addObserver(self, "currentPairChanged", "MetricsMachine.currentPairChanged")
+        self.show_instances = self.w.getItem("showInstancesCheckbox").get()
         self.grid_view = self.w.getItem("gridView")
         self.grid_container = self.grid_view.getMerzContainer()
         self.grid_item_container = self.grid_container.appendBaseSublayer(
@@ -305,7 +337,7 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
         # Scales for kerning pair itself.
         # First is the desired height relative to the vertical space
         # Second is the desired width if it needs to snap smaller.
-        self.scales = (0.7, 0.9)
+        self.scales = (1, 0.9)  # (0.7, 0.9)
         self.update_ds(designspace)
 
     def started(self):
@@ -335,14 +367,19 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
             )
             if not path:
                 return
-            ds = OpenDesignspace(path, showInterface=False)
+            designspace = OpenDesignspace(path, showInterface=False)
         else:
             path = self.designspace_paths[index]
-            ds = OpenDesignspace(path, showInterface=False)
-        if not check_designspace_sources(ds):
+            designspace = OpenDesignspace(path, showInterface=False)
+        if not check_designspace_sources(designspace):
             self.set_designspace_selection()
             return
-        self.update_ds(ds)
+        self.update_ds(designspace)
+        self.build_cells()
+
+    def showInstancesCheckboxCallback(self, sender):
+        self.show_instances = sender.get()
+        self.update_fonts()
         self.build_cells()
 
     def windowDidResize(self, sender):
@@ -350,6 +387,8 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
 
     def currentPairChanged(self, sender):
         self.pair = sender["pair"]
+        if self.show_instances:
+            self.update_fonts()
         self.build_cells()
 
     def roboFontAppearanceChanged(self, info):
@@ -370,6 +409,10 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
         if not hits:
             return None
         hit = hits[0]
+        # User should not be able to click on an instance
+        i = int(hit.getName())
+        if self.fonts[i][-1] == "instance":
+            return None
         return hit
 
     def _convert_location(self, event):
@@ -393,7 +436,7 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
             return
         hit.setBorderWidth(2)
         i = int(hit_name)
-        font = self.fonts[i]
+        font = self.fonts[i][0]
         x, y = hit.getPosition()
         w, h = hit.getSize()
         bottom_middle = (x + w / 2, y)
@@ -407,43 +450,54 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
         )
 
     def mouseDown(self, view, event):
-        # Treat Control-click like right-click.
-        if event.modifierFlags() & NSEventModifierFlagControl:
-            self.build_cells()
-            self._show_kerning_popover(event)
-            return
-
         self.build_cells()
-        unpacked_event = merz.unpackEvent(event)
 
-        click_count = unpacked_event["clickCount"]
+        unpacked_event = merz.unpackEvent(event)
         x, y = self._convert_location(unpacked_event)
         hit = self._get_item_at_event((x, y))
 
         if hit is None:
             return
 
+        # Treat control-click like right-click
+        if event.modifierFlags() & NSEventModifierFlagControl:
+            self._show_kerning_popover(event)
+            return
+
         hit_name = hit.getName()
-        if hit_name is not None:
-            hit.setBorderWidth(2)
+        if hit_name is None:
+            return
 
-            if click_count == 2:
-                i = int(hit_name)
-                old_font = self.fonts[i]
+        hit.setBorderWidth(2)
 
-                current_font = CurrentFont()
-                if current_font is not None and current_font.path == old_font.path:
-                    return
+        click_count = unpacked_event["clickCount"]
+        if click_count == 2:
+            i = int(hit_name)
+            old_font = self.fonts[i][0]
 
-                pair = self.pair
-                new_font, controller = open_font_in_mm(old_font)
-                self.fonts[i] = new_font
+            current_font = CurrentFont()
+            if current_font is not None and current_font.path == old_font.path:
+                return
 
-                if old_font is not new_font:
-                    old_font.close()
+            pair = self.pair
+            new_font, controller = open_font_in_mm(old_font)
+            _, location, kind = self.fonts[i]
+            self.fonts[i] = (new_font, location, kind)
 
-                mm.SetCurrentPair(pair, font=new_font)
-                self.pair = pair
+            # Keep the persistent source list in sync.
+            for j, (font, source_location, source_kind) in enumerate(self.source_fonts):
+                if font is old_font:
+                    self.source_fonts[j] = (
+                        new_font,
+                        source_location,
+                        source_kind,
+                    )
+                    break
+            if old_font is not new_font:
+                old_font.close()
+
+            mm.SetCurrentPair(pair, font=new_font)
+            self.pair = pair
 
     def rightMouseDown(self, view, event):
         self.build_cells()
@@ -469,24 +523,56 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
         self.designspace_paths = find_designspace_paths(current_path)
 
         self.designspace_options = [
-            path.name
-            for path in self.designspace_paths
-        ] + ["---", "Other..."]
+            path.name for path in self.designspace_paths
+        ] + [
+            "---",
+            "Other...",
+        ]
 
         popup = self.w.getItem("designspace")
         popup.setItems(self.designspace_options)
         self.set_designspace_selection()
 
-        self.fonts = [
-            OpenFont(source.path, showInterface=False)
-            for source in designspace.sources
+        self.source_fonts = [
+            (
+                OpenFont(source.path, showInterface=False),
+                get_axis_location(source),
+                "source",
+            )
+            for source in self.designspace.sources
         ]
+
+        self.update_fonts()
+
+    def update_fonts(self):
+        self.fonts = list(self.source_fonts)
+
+        if self.show_instances:
+            for instance in self.designspace.instances:
+                self.fonts.append(
+                    (
+                        self.designspace.makeInstance(
+                            instance,
+                            glyphNames=self.pair,
+                            decomposeComponents=True,
+                        ),
+                        get_axis_location(instance),
+                        "instance",
+                    )
+                )
+
+        self.fonts.sort(
+            key=lambda item: tuple(
+                item[1].get(axis.name, axis.default)
+                for axis in self.designspace.axes
+            )
+        )
 
     def build_cells(self):
         """Builds/rebuilds the cells from the ground up."""
         # Calculate sizes and arrangement
         margin = 0
-        gutter = 2
+        gutter = 4
         font_count = len(self.fonts)
         w, h = self.grid_view.width(), self.grid_view.height()
         # aspect = w / h
@@ -513,7 +599,8 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
             for col in range(cols):
                 if i + 1 > font_count:
                     continue
-                font = self.fonts[i]
+                font = self.fonts[i][0]
+                instance = self.fonts[i][-1] == "instance"
                 # Calculate slant offset, to help center slanted styles in the cell.
                 slant_offset_key = "com.typemytype.robofont.italicSlantOffset"
                 if slant_offset_key in font.lib.keys():
@@ -521,15 +608,16 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
                 else:
                     slant_offset = 0
                 pair_value = get_kern_value(font, self.pair)
-                black_or_white = (0, 0, 0, 1) if not inDarkMode() else (1, 1, 1, 1)
-                kern_fill_color = black_or_white
+                neutral_color = (0, 0, 0, 1) if not inDarkMode() else (1, 1, 1, 1)
+                glyph_path_color = neutral_color if not instance else new_alpha(neutral_color, 0.4)
+                kern_value_color = neutral_color
                 kern_bg_color = (1, 1, 1, 0)
                 if pair_value is not None:
                     if pair_value < 0:
-                        kern_fill_color = (1, 0, 0, 1)
+                        kern_value_color = (1, 0, 0, 1)
                         kern_bg_color = (1, 0, 0, 0.1)
                     elif pair_value > 0:
-                        kern_fill_color = (0, 170 / 255, 15 / 255, 1)
+                        kern_value_color = (0, 170 / 255, 15 / 255, 1)
                         kern_bg_color = (0, 1, 0.2, 0.1)
                 # Calculate the bottom left of each cell. Start from top left.
                 x = margin + col * uw + (gutter * col)
@@ -538,8 +626,8 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
                 self.grid_container.appendBaseSublayer(
                     position=(x, y),
                     size=(uw, uh),
-                    borderColor=kern_fill_color,
-                    borderWidth=0,
+                    borderColor=kern_value_color,
+                    borderWidth=0 if instance or not self.show_instances else 1,
                     backgroundColor=kern_bg_color,
                     cornerRadius=8,
                     name=str(i),
@@ -549,23 +637,29 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
                 self.grid_container.appendTextLineSublayer(
                     position=(x + uw / 2, y + 20),
                     pointSize=10,
-                    fillColor=black_or_white,
+                    fillColor=neutral_color,
                     horizontalAlignment="center",
                     text=f"{font.info.styleName}",
                     acceptsHit=False,
                 )
                 # Kerning value text
-                kerning_value_text = str(get_kern_value(font, self.pair))
+                kerning_value_text = (
+                    str(round(pair_value, 1))
+                    if pair_value is not None
+                    else "None"
+                )
                 self.grid_container.appendTextLineSublayer(
                     position=(x + uw / 2, y + 45),
                     pointSize=12,
                     weight="bold",
-                    fillColor=kern_fill_color,
+                    fillColor=kern_value_color,
                     horizontalAlignment="center",
                     text=kerning_value_text,
                     acceptsHit=False,
                     borderWidth=1.5 if check_exception(font, self.pair) else 0,
-                    borderColor=kern_fill_color if check_exception(font, self.pair) else (1, 1, 1, 0),
+                    borderColor=kern_value_color
+                    if check_exception(font, self.pair)
+                    else (1, 1, 1, 0),
                     cornerRadius=5,
                     padding=(8, 1),
                 )
@@ -584,7 +678,7 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
                     glyph = font[glyph_name]
                     glyph_path = glyph.getRepresentation("merz.CGPath")
                     glyph_path_layer = kern_pair_sublayer.appendPathSublayer(
-                        fillColor=black_or_white,
+                        fillColor=glyph_path_color,
                         acceptsHit=False,
                     )
                     glyph_path_layer.addTranslationTransformation((x_advance, 0))
@@ -596,7 +690,8 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
                     x_advance = glyph_width + pair_advance + slant_offset
                     pair_width += x_advance
                     pair_i += 1
-                scale = uh / font.info.unitsPerEm * self.scales[0]
+                available_height = max(uh - 50, 1)
+                scale = available_height / font.info.unitsPerEm * self.scales[0]
                 if scale * pair_width > uw * self.scales[1]:
                     width_exceeds = True
                 kern_pair_sublayers.append((kern_pair_sublayer, pair_width, (x, y)))
@@ -627,7 +722,7 @@ if __name__ == "__main__":
     else:
         designspace_paths = find_designspace_paths(f.path)
         if designspace_paths:
-            path = designspace_paths[0]
+            path = find_designspace_for_font(f, designspace_paths)
         else:
             path = GetFile(
                 message="Please choose a .designspace file for use with Kernparison.",
