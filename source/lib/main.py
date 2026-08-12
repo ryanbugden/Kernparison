@@ -1,4 +1,5 @@
 # menuTitle: Kernparison
+# author: Ryan Bugden
 
 
 from AppKit import NSEventModifierFlagControl
@@ -13,12 +14,6 @@ from mojo.UI import Message, GetFile, inDarkMode
 from glyphNameFormatter.reader import n2u
 import metricsMachine as mm
 from mm4.interface.documentWindow import MMDocumentWindowController
-
-
-"""
-Ryan Bugden
-October 2025
-"""
 
 
 def check_designspace_sources(designspace):
@@ -108,8 +103,11 @@ class MiniKernerPopoverController(ezui.WindowController):
         self.pair = pair
         self.location = location
 
+        # Get the actual kern value from the font
         kern_value = get_kern_value(font, pair)
-        kern_value = 0 if kern_value is None else int(kern_value)
+        # A temporary, fake kern value, to use for
+        # previewing the kerning change in this popover
+        self.temp_kern_value = 0 if kern_value is None else int(kern_value)
 
         content = """
         * HorizontalStack              @horizontalStack
@@ -127,7 +125,7 @@ class MiniKernerPopoverController(ezui.WindowController):
                 distribution="gravity"
             ),
             kernValue=dict(
-                value=kern_value,
+                value=self.temp_kern_value,
                 valueType="integer",
                 valueIncrement=5,
                 width=60,
@@ -179,12 +177,13 @@ class MiniKernerPopoverController(ezui.WindowController):
         glyph_names = [context_glyph, context_glyph, left, right, context_glyph, context_glyph]
 
         preview_width, preview_height = self.preview.width(), self.preview.height()
-        kern_value = get_kern_value(self.font, self.pair) or 0
+
+        preview_kern_value = 0 if self.temp_kern_value is None else self.temp_kern_value
 
         background_color = (1, 1, 1, 0)
-        if kern_value < 0:
+        if preview_kern_value < 0:
             background_color = (1, 0, 0, 0.1)
-        elif kern_value > 0:
+        elif preview_kern_value > 0:
             background_color = (0, 1, 0.2, 0.1)
 
         self.preview_container.appendBaseSublayer(
@@ -204,7 +203,7 @@ class MiniKernerPopoverController(ezui.WindowController):
                 i < len(glyph_names) - 1
                 and (glyph_name, glyph_names[i + 1]) == self.pair
             ):
-                advance += kern_value
+                advance += preview_kern_value
             advances.append((glyph_name, advance))
             total_width += advance
 
@@ -230,18 +229,33 @@ class MiniKernerPopoverController(ezui.WindowController):
             x += advance * scale
 
     def kernValueCallback(self, sender):
-        kern_value = sender.get()
-        self.font.kerning[convert_to_group_pair(self.font, self.pair)] = kern_value
+        kern_field_value = sender.get()
+        self.temp_kern_value = kern_field_value
         self.build_preview()
 
     def saveButtonCallback(self, sender):
+        # Save the desired kern value into that font document
+        self.set_kerning(self.font, self.pair, self.temp_kern_value)
         self.font.save()
         self.controller.build_cells()
         self.w.close()
 
     def copyButtonCallback(self, sender):
-        kern_value = self.w.getItem("kernValue").get()
-        CurrentFont().kerning[convert_to_group_pair(self.font, self.pair)] = kern_value
+        kern_field_value = self.w.getItem("kernValue").get()
+        self.set_kerning(CurrentFont(), self.pair, kern_field_value)
+
+    def set_kerning(self, font, flat_pair, value):
+        """
+        Set a kerning value for a given font, a given flat representative
+        pair (group pair converted automatically, and a given value).
+        The the value is None, the pair will be removed.
+        """
+        group_pair = convert_to_group_pair(font, flat_pair)
+        if value is None:
+            if group_pair in font.kerning:
+                del font.kerning[group_pair]
+        elif isinstance(value, float) or isinstance(value, int):
+            font.kerning[group_pair] = value
 
 
 class KernparisonWindowController(Subscriber, ezui.WindowController):
