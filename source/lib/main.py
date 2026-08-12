@@ -12,8 +12,12 @@ from mojo.subscriber import Subscriber
 from mojo.events import addObserver, removeObserver
 from mojo.UI import Message, GetFile, inDarkMode
 from glyphNameFormatter.reader import n2u
-import metricsMachine as mm
-from mm4.interface.documentWindow import MMDocumentWindowController
+try:
+    import metricsMachine as mm
+    from mm4.interface.documentWindow import MMDocumentWindowController
+except ModuleNotFoundError:
+    mm = None
+    MMDocumentWindowController = None
 
 
 def new_alpha(color, alpha):
@@ -714,23 +718,30 @@ class KernparisonWindowController(Subscriber, ezui.WindowController):
 
 
 if __name__ == "__main__":
-    f = CurrentFont()
-    if f is None:
-        Message("Please open a UFO before launching Kernparison.")
-    elif CurrentDesignspace():
-        OpenKernparison(CurrentDesignspace())
+    if mm is None:
+        Message(
+            "Kernparison requires MetricsMachine.",
+            informativeText="Please install MetricsMachine before using Kernparison.",
+            alertStyle="critical",
+        )
     else:
-        designspace_paths = find_designspace_paths(f.path)
-        if designspace_paths:
-            path = find_designspace_for_font(f, designspace_paths)
+        f = CurrentFont()
+        if f is None:
+            Message("Please open a UFO before launching Kernparison.")
+        elif CurrentDesignspace():
+            OpenKernparison(CurrentDesignspace())
         else:
-            path = GetFile(
-                message="Please choose a .designspace file for use with Kernparison.",
-                title="Open a Designspace",
-                directory=str(Path(f.path).parent),
-                allowsMultipleSelection=False,
-                fileTypes=["designspace"],
-            )
-        if path:
-            designspace = OpenDesignspace(path, showInterface=False)
-            OpenKernparison(designspace)
+            designspace_paths = find_designspace_paths(f.path)
+            if designspace_paths:
+                path = find_designspace_for_font(f, designspace_paths)
+            else:
+                path = GetFile(
+                    message="Please choose a .designspace file for use with Kernparison.",
+                    title="Open a Designspace",
+                    directory=str(Path(f.path).parent),
+                    allowsMultipleSelection=False,
+                    fileTypes=["designspace"],
+                )
+            if path:
+                designspace = OpenDesignspace(path, showInterface=False)
+                OpenKernparison(designspace)
